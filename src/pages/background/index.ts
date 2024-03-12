@@ -13,6 +13,12 @@ import { exhaustiveMatchingGuard } from "@src/shared/ts-utils/exhaustiveMatching
 import { createNewChatGPTSlot } from "@src/shared/slot/createNewChatGPTSlot";
 import { PROMPT_GENERATE_PROMPT } from "@src/constant/promptGeneratePrompt";
 import { ChatHistoryStorage } from "@pages/background/lib/storage/chatHistoryStorage";
+import { googleTranslate } from "./lib/infra/googleTranslate";
+
+// @ts-ignore
+import { decode } from "dentity";
+import { nlp } from "./lib/infra/nlp";
+import { elevenlabs } from "./lib/infra/audio";
 
 reloadOnUpdate("pages/background");
 
@@ -119,6 +125,51 @@ chrome.runtime.onConnect.addListener((port) => {
               result: response.result,
             },
           });
+          break;
+        }
+        case "RequestTranslation": {
+          if (message.input) {
+            const response = await googleTranslate({
+              input: JSON.stringify(message.input),
+            });
+            sendResponse({
+              type: "RequestTranslation",
+              data: {
+                isDone: true,
+                result: decode(response.result),
+              },
+            });
+          }
+          break;
+        }
+        case "RequestNLP": {
+          if (message.input) {
+            const response = await nlp({
+              input: JSON.stringify(message.input),
+            });
+            sendResponse({
+              type: "RequestNLP",
+              data: {
+                isDone: true,
+                result: response.result,
+              },
+            });
+          }
+          break;
+        }
+        case "RequestAudio": {
+          if (message.input) {
+            const response = await elevenlabs({
+              input: JSON.stringify(message.input),
+            });
+            sendResponse({
+              type: "RequestAudio",
+              data: {
+                isDone: true,
+                result: response.result,
+              },
+            });
+          }
           break;
         }
         case "RequestOnetimeChatGPT": {

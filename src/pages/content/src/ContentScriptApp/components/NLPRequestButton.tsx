@@ -2,7 +2,7 @@ import { ComponentPropsWithRef, CSSProperties } from "react";
 import styled from "@emotion/styled";
 import { Spinner, Text, Tooltip } from "@chakra-ui/react";
 import { COLORS, Z_INDEX } from "@src/constant/style";
-import { ChatIcon } from "@chakra-ui/icons";
+import { AttachmentIcon } from "@chakra-ui/icons";
 
 const GAP = 4;
 
@@ -45,29 +45,21 @@ const labelTextInlineStyle: CSSProperties = {
   fontFamily: "Noto Sans KR, sans-serif",
 };
 
-type GPTRequestButtonProps = {
+type NLPRequestButtonProps = {
   top: number;
   left: number;
   loading: boolean;
-  selectedSlot?: Slot;
 } & ComponentPropsWithRef<"button">;
 
-export default function GPTRequestButton({
+export default function NLPRequestButton({
   top,
   left,
   loading,
   style,
-  selectedSlot,
   ...restProps
-}: GPTRequestButtonProps) {
+}: NLPRequestButtonProps) {
   return (
-    <Tooltip
-      label={
-        selectedSlot?.name && (
-          <Text style={labelTextInlineStyle}>{selectedSlot.name}</Text>
-        )
-      }
-    >
+    <Tooltip label={<Text style={labelTextInlineStyle}>Google Translate</Text>}>
       <StyledRequestButton
         aria-busy={loading}
         disabled={loading}
@@ -81,7 +73,7 @@ export default function GPTRequestButton({
         {loading ? (
           <Spinner color="white" width="8px" height="px" />
         ) : (
-          <ChatIcon aria-label="request" color="white" boxSize="12px" />
+          <AttachmentIcon aria-label="request" color="white" boxSize="16px" />
         )}
       </StyledRequestButton>
     </Tooltip>

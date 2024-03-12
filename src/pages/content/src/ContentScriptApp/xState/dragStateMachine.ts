@@ -20,11 +20,22 @@ type TextSelectedEvent = {
 
 type Events =
   | TextSelectedEvent
-  | { type: "CLOSE_MESSAGE_BOX" | "REQUEST" | "RECEIVE_END" | "RECEIVE_CANCEL" }
+  | {
+      type:
+        | "CLOSE_MESSAGE_BOX"
+        | "REQUEST_GPT"
+        | "REQUEST_TRANSLATION"
+        | "REQUEST_NLP"
+        | "REQUEST_AUDIO"
+        | "RECEIVE_END"
+        | "RECEIVE_CANCEL";
+    }
   | { type: "RECEIVE_ING"; data: string };
 
 interface Context {
   chats: Chat[];
+  nlp: {};
+  audioTrack: ArrayBuffer | null;
   selectedText: string;
   selectedTextNodeRect: NodeRect;
   requestButtonPosition: RequestButtonPosition;
@@ -37,10 +48,21 @@ type Services = {
   getGPTResponse: {
     data: { firstChunk: string };
   };
+  getTranslationResponse: {
+    data: { firstChunk: string };
+  };
+  getNLPResponse: {
+    data: { firstChunk: string };
+  };
+  getAudioResponse: {
+    data: { firstChunk: string | ArrayBuffer };
+  };
 };
 
 const initialContext: Context = {
   chats: [] as Chat[],
+  nlp: {},
+  audioTrack: null,
   selectedText: "",
   requestButtonPosition: { top: 0, left: 0 },
   anchorNodePosition: { top: 0, center: 0, bottom: 0 },
@@ -85,10 +107,67 @@ const dragStateMachine = createMachine(
               cond: "isInvalidTextSelectedEvent",
             },
           ],
-          REQUEST: { target: "loading", actions: "addRequestChat" },
+          REQUEST_GPT: { target: "gpt_loading", actions: "addRequestChat" },
+          REQUEST_TRANSLATION: { target: "translation_loading" },
+          REQUEST_NLP: { target: "nlp_loading" },
+          REQUEST_AUDIO: { target: "audio_loading" },
         },
       },
-      loading: {
+      audio_loading: {
+        tags: "showRequestButton",
+        entry: ["setAnchorNodePosition"],
+        exit: ["setPositionOnScreen"],
+        invoke: {
+          src: "getAudioResponse",
+          onDone: {
+            target: "audio_response_message_box",
+            actions: "addAudio",
+          },
+          onError: {
+            target: "error_message_box",
+            actions: assign({
+              error: (_, event) => event.data,
+            }),
+          },
+        },
+      },
+      nlp_loading: {
+        tags: "showRequestButton",
+        entry: ["setAnchorNodePosition"],
+        exit: ["setPositionOnScreen"],
+        invoke: {
+          src: "getNLPResponse",
+          onDone: {
+            target: "nlp_response_message_box",
+            actions: "addNLP",
+          },
+          onError: {
+            target: "error_message_box",
+            actions: assign({
+              error: (_, event) => event.data,
+            }),
+          },
+        },
+      },
+      translation_loading: {
+        tags: "showRequestButton",
+        entry: ["setAnchorNodePosition"],
+        exit: ["setPositionOnScreen"],
+        invoke: {
+          src: "getTranslationResponse",
+          onDone: {
+            target: "temp_response_message_box",
+            actions: "addInitialResponseChat",
+          },
+          onError: {
+            target: "error_message_box",
+            actions: assign({
+              error: (_, event) => event.data,
+            }),
+          },
+        },
+      },
+      gpt_loading: {
         tags: "showRequestButton",
         entry: ["setAnchorNodePosition"],
         exit: ["setPositionOnScreen"],
@@ -121,7 +200,19 @@ const dragStateMachine = createMachine(
           CLOSE_MESSAGE_BOX: "idle",
         },
       },
+      nlp_response_message_box: {
+        tags: "showNLPResponseMessages",
+        on: {
+          CLOSE_MESSAGE_BOX: "idle",
+        },
+      },
       error_message_box: {
+        on: {
+          CLOSE_MESSAGE_BOX: "idle",
+        },
+      },
+      audio_response_message_box: {
+        tags: "showAudioResponseMessages",
         on: {
           CLOSE_MESSAGE_BOX: "idle",
         },
@@ -158,6 +249,16 @@ const dragStateMachine = createMachine(
             role: "assistant",
             content: event.data.firstChunk,
           }),
+      }),
+      addNLP: assign({
+        nlp: (context, event) => (context.nlp = event.data.firstChunk),
+      }),
+      addAudio: assign({
+        audioTrack: (context, event) =>
+          (context.audioTrack =
+            typeof event.data.firstChunk === "string"
+              ? null
+              : event.data.firstChunk),
       }),
       addResponseChatChunk: assign({
         chats: ({ chats }, event) => {

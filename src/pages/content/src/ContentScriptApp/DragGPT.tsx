@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   getSelectionNodeRect,
   getSelectionText,
@@ -17,6 +17,10 @@ import ChatText from "@src/shared/component/ChatText";
 import AssistantChat from "@src/shared/component/AssistantChat";
 import MessageBox from "@pages/content/src/ContentScriptApp/components/messageBox/MessageBox";
 import { t } from "@src/chrome/i18n";
+import GoogleTranslateRequestButton from "./components/GoogleTranslateRequestButton";
+import NLPRequestButton from "./components/NLPRequestButton";
+import NLPMessageBox from "./components/messageBox/NLPMessageBox";
+import AudioRequestButton from "./components/AudioRequestButton";
 
 const Container = styled.div`
   * {
@@ -53,6 +57,80 @@ async function getGPTResponseAsStream({
   });
 }
 
+async function getGoogleTranslate({
+  input,
+  onFinish,
+}: {
+  input: string;
+  onFinish: (result: string) => unknown;
+}) {
+  return new Promise<{ firstChunk: string }>((resolve, reject) => {
+    sendMessageToBackground({
+      message: {
+        type: "RequestTranslation",
+        input,
+      },
+      handleSuccess: (response) => {
+        if (response.isDone) {
+          resolve({ firstChunk: response.result });
+          return onFinish(response.result);
+        }
+      },
+      handleError: reject,
+    });
+  });
+}
+
+async function getNLP({
+  input,
+  onFinish,
+}: {
+  input: string;
+  onFinish: (result: string) => unknown;
+}) {
+  return new Promise<{ firstChunk: string }>((resolve, reject) => {
+    sendMessageToBackground({
+      message: {
+        type: "RequestNLP",
+        input,
+      },
+      handleSuccess: (response) => {
+        if (response.isDone) {
+          resolve({ firstChunk: response.result });
+          return onFinish(response.result);
+        }
+      },
+      handleError: reject,
+    });
+  });
+}
+
+async function getAudio({
+  input,
+  onFinish,
+}: {
+  input: string;
+  onFinish: (result: ArrayBuffer | string) => unknown;
+}) {
+  return new Promise<{ firstChunk: string | ArrayBuffer }>(
+    (resolve, reject) => {
+      sendMessageToBackground({
+        message: {
+          type: "RequestAudio",
+          input,
+        },
+        handleSuccess: (response) => {
+          if (response.isDone) {
+            resolve({ firstChunk: response.result });
+            return onFinish(response.result);
+          }
+        },
+        handleError: reject,
+      });
+    }
+  );
+}
+
 export default function DragGPT() {
   const selectedSlot = useSelectedSlot();
   const [state, send] = useMachine(dragStateMachine, {
@@ -68,14 +146,58 @@ export default function DragGPT() {
       },
     },
     services: {
-      getGPTResponse: (context) =>
-        getGPTResponseAsStream({
+      getGPTResponse: (
+        context
+      ): Promise<{
+        firstChunk: string;
+      }> => {
+        return getGPTResponseAsStream({
           input: context.selectedText,
           onDelta: (chunk) => send("RECEIVE_ING", { data: chunk }),
           onFinish: () => send("RECEIVE_END"),
-        }),
+        });
+      },
+      getTranslationResponse: (context) => {
+        return getGoogleTranslate({
+          input: context.selectedText,
+          onFinish: () => send("RECEIVE_END"),
+        });
+      },
+      getNLPResponse: (context) => {
+        return getNLP({
+          input: context.selectedText,
+          onFinish: () => send("RECEIVE_END"),
+        });
+      },
+      getAudioResponse: (context) => {
+        return getAudio({
+          input: context.selectedText,
+          onFinish: async (result) => {
+            console.log(context)
+            console.log(result)
+            if (context.audioTrack) {
+              const arrayBuffer = context.audioTrack;
+              const blob = new Blob([arrayBuffer], {
+                type: "audio/mpeg",
+              });
+              const blobUrl = URL.createObjectURL(blob);
+              console.log(blobUrl);
+              setAudio(blobUrl);
+            }
+          },
+        });
+      },
     },
   });
+
+  const [audio, setAudio] = useState("");
+  const audioRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (audio && audioRef.current) {
+      audioRef.current.play();
+    }
+  }, [audio]);
 
   useEffect(() => {
     const onMouseUp = async (event: MouseEvent) => {
@@ -101,7 +223,19 @@ export default function DragGPT() {
   }, []);
 
   const requestGPT = () => {
-    send("REQUEST");
+    send("REQUEST_GPT");
+  };
+
+  const requestTranslation = () => {
+    send("REQUEST_TRANSLATION");
+  };
+
+  const requestNLP = () => {
+    send("REQUEST_NLP");
+  };
+
+  const requestAudio = () => {
+    send("REQUEST_AUDIO");
   };
 
   const closeMessageBox = () => {
@@ -113,10 +247,34 @@ export default function DragGPT() {
       {state.hasTag("showRequestButton") && (
         <GPTRequestButton
           onClick={requestGPT}
-          loading={state.matches("loading")}
+          loading={state.matches("gpt_loading")}
           top={state.context.requestButtonPosition.top}
           left={state.context.requestButtonPosition.left}
           selectedSlot={selectedSlot}
+        />
+      )}
+      {state.hasTag("showRequestButton") && (
+        <GoogleTranslateRequestButton
+          onClick={requestTranslation}
+          loading={state.matches("translation_loading")}
+          top={state.context.requestButtonPosition.top}
+          left={state.context.requestButtonPosition.left + 30}
+        />
+      )}
+      {state.hasTag("showRequestButton") && (
+        <NLPRequestButton
+          onClick={requestNLP}
+          loading={state.matches("nlp_loading")}
+          top={state.context.requestButtonPosition.top}
+          left={state.context.requestButtonPosition.left + 60}
+        />
+      )}
+      {state.hasTag("showRequestButton") && (
+        <AudioRequestButton
+          onClick={requestAudio}
+          loading={state.matches("nlp_loading")}
+          top={state.context.requestButtonPosition.top}
+          left={state.context.requestButtonPosition.left + 90}
         />
       )}
       {state.matches("temp_response_message_box") && (
@@ -145,6 +303,24 @@ export default function DragGPT() {
           anchorBottom={state.context.anchorNodePosition.bottom}
           positionOnScreen={state.context.positionOnScreen}
         />
+      )}
+      {state.hasTag("showNLPResponseMessages") && (
+        <NLPMessageBox
+          onClose={closeMessageBox}
+          nlp={state.context.nlp}
+          anchorTop={state.context.anchorNodePosition.top}
+          anchorCenter={state.context.anchorNodePosition.center}
+          anchorBottom={state.context.anchorNodePosition.bottom}
+          positionOnScreen={state.context.positionOnScreen}
+          header={undefined}
+          content={undefined}
+          width={0}
+        />
+      )}
+      {state.hasTag("showAudioResponseMessages") && audio && (
+        <div className="bg-white fixed top-10 right-10 p-20">
+          <audio ref={audioRef} controls src={`${audio}`} className="w-full" />
+        </div>
       )}
       {state.matches("error_message_box") && (
         <ErrorMessageBox

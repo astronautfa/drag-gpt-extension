@@ -99,6 +99,21 @@ declare global {
     input?: string;
     data?: { result: string; chunk?: string; isDone?: boolean };
   };
+  type RequestTranslation = {
+    type: "RequestTranslation";
+    input?: string;
+    data?: { result: string; chunk?: string; isDone?: boolean };
+  };
+  type RequestNLP = {
+    type: "RequestNLP";
+    input?: string;
+    data?: { result: string; chunk?: string; isDone?: boolean };
+  };
+  type RequestAudio = {
+    type: "RequestAudio";
+    input?: string;
+    data?: { result: string | ArrayBuffer; chunk?: ArrayBuffer; isDone?: boolean };
+  };
   type RequestDragGPT = {
     type: "RequestDragGPTStream";
     input?: { chats: Chat[]; sessionId: string };
@@ -180,6 +195,9 @@ declare global {
 
   type Message =
     | RequestInitialDragGPT
+    | RequestTranslation
+    | RequestNLP
+    | RequestAudio
     | RequestQuickChatGPT
     | RequestDragGPT
     | RequestOngoingChatGPT
