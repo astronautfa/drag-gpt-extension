@@ -17,8 +17,8 @@ export async function googleTranslate({
 }): Promise<{ result: string }> {
   const API_KEY = "AIzaSyDSDFure-4oYx6g4eCiWhtj564M6jvUUlU";
 
-  const fromLang = "en";
-  const toLang = "fr";
+  const fromLang = "fr";
+  const toLang = "en";
 
   let url = `https://translation.googleapis.com/language/translate/v2?key=${API_KEY}`;
   url += "&q=" + encodeURI(input);

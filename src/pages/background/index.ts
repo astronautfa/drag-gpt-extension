@@ -19,6 +19,7 @@ import { googleTranslate } from "./lib/infra/googleTranslate";
 import { decode } from "dentity";
 import { nlp } from "./lib/infra/nlp";
 import { elevenlabs } from "./lib/infra/audio";
+import { deeplTranslate } from "./lib/infra/deeplTranslate";
 
 reloadOnUpdate("pages/background");
 
@@ -142,6 +143,21 @@ chrome.runtime.onConnect.addListener((port) => {
           }
           break;
         }
+        case "RequestDeepLTranslation": {
+          if (message.input) {
+            const response = await deeplTranslate({
+              input: JSON.stringify(message.input),
+            });
+            sendResponse({
+              type: "RequestDeepLTranslation",
+              data: {
+                isDone: true,
+                result: response.result,
+              },
+            });
+          }
+          break;
+        }
         case "RequestNLP": {
           if (message.input) {
             const response = await nlp({
@@ -162,11 +178,17 @@ chrome.runtime.onConnect.addListener((port) => {
             const response = await elevenlabs({
               input: JSON.stringify(message.input),
             });
+            console.log({
+              data: {
+                isDone: true,
+                result: response,
+              },
+            });
             sendResponse({
               type: "RequestAudio",
               data: {
                 isDone: true,
-                result: response.result,
+                result: response,
               },
             });
           }

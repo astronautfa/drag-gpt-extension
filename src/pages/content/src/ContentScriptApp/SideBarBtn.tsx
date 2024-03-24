@@ -26,6 +26,40 @@ async function getGoogleTranslate({
   });
 }
 
+async function getDeepLTranslate({
+  input,
+  onFinish,
+}: {
+  input: string;
+  onFinish: (result: {
+    translated_text: string;
+    translated_sentences: string[];
+    original_sentences: string[];
+  }) => unknown;
+}) {
+  return new Promise<{
+    firstChunk: {
+      translated_text: string;
+      translated_sentences: string[];
+      original_sentences: string[];
+    };
+  }>((resolve, reject) => {
+    sendMessageToBackground({
+      message: {
+        type: "RequestDeepLTranslation",
+        input,
+      },
+      handleSuccess: (response) => {
+        if (response.isDone) {
+          resolve({ firstChunk: response.result });
+          return onFinish(response.result);
+        }
+      },
+      handleError: reject,
+    });
+  });
+}
+
 const SideBarBtn = () => {
   const [isActive, setIsActive] = useState<boolean>(false);
   // const [paragraphs, setParagraphs] = useState<
@@ -34,30 +68,31 @@ const SideBarBtn = () => {
 
   useEffect(() => {
     if (isActive) {
+      const paragraphs = document.querySelectorAll("p");
 
-      const paragraphs = document.querySelectorAll("p")
-      console.log(paragraphs[4].innerText);
-      getGoogleTranslate({
-        input: paragraphs[4].innerText,
+      // getGoogleTranslate({
+      //   input: paragraphs[4].innerText,
+      //   onFinish: (result) =>
+      //     ReactDOM.render(
+      //       <TranslationBox
+      //         text={paragraphs[4].innerText}
+      //         translation={result}
+      //       />,
+      //       paragraphs[4]
+      //     ),
+      // });
+
+      getDeepLTranslate({
+        input: paragraphs[8].innerText,
         onFinish: (result) =>
           ReactDOM.render(
             <TranslationBox
-              text={paragraphs[4].innerText}
-              translation={result}
+              text={paragraphs[8].innerText}
+              translation={result?.translated_text}
+              original_sentences={result.original_sentences}
+              translated_senteces={result.translated_sentences}
             />,
-            paragraphs[4]
-          ),
-      });
-
-      getGoogleTranslate({
-        input: paragraphs[5].innerText,
-        onFinish: (result) =>
-          ReactDOM.render(
-            <TranslationBox
-              text={paragraphs[5].innerText}
-              translation={result}
-            />,
-            paragraphs[5]
+            paragraphs[8]
           ),
       });
 
@@ -99,14 +134,43 @@ const SideBarBtn = () => {
 const TranslationBox = ({
   text,
   translation,
+  original_sentences,
+  translated_senteces,
 }: {
   text: string;
   translation: string;
+  original_sentences: string[];
+  translated_senteces: string[];
 }) => {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>();
+
   return (
     <React.Fragment data-translation={translation} data-original={text}>
-      {text}
-      <p className=" text-blue-400 bg-red-500">{translation}</p>
+      {original_sentences.map((os, index) => (
+        <span
+          key={index}
+          onMouseLeave={() => setHoveredIndex(null)}
+          onMouseEnter={() => setHoveredIndex(index)}
+          style={hoveredIndex === index ? { backgroundColor: "gray" } : {}}
+        >
+          {os}
+        </span>
+      ))}
+      <p
+        className="text-blue-400 bg-red-500"
+        // style={{ color: "red", backgroundColor: "white" }}
+      >
+        {translated_senteces.map((ts, index) => (
+          <span
+            key={index}
+            onMouseLeave={() => setHoveredIndex(null)}
+            onMouseEnter={() => setHoveredIndex(index)}
+            style={hoveredIndex === index ? { backgroundColor: "gray" } : {}}
+          >
+            {ts}
+          </span>
+        ))}
+      </p>
     </React.Fragment>
   );
 };

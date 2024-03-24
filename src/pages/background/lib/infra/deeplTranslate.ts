@@ -10,39 +10,24 @@ type Error = {
     message?: string;
   };
 };
-
-const convertBlobToBase64 = (blob: Blob) =>
-  new Promise<string | ArrayBuffer | null>((resolve) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(blob);
-    reader.onloadend = () => {
-      const base64data = reader.result;
-      resolve(base64data);
-    };
-  });
-
-export async function elevenlabs({
+export async function deeplTranslate({
   input,
 }: {
   input: string;
-}): Promise<string | ArrayBuffer | null> {
-  let voice_id = "21m00Tcm4TlvDq8ikWAM"; //Change the value to the available voice ID you prefer.
+}): Promise<{ result: string }> {
+  console.log("sending deepl request");
 
-  const ELEVENLABS_API_KEY = "ee39fc2f6bb06e0187835742b0b65227";
+  const url = `http://localhost:5000/translate`;
 
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voice_id}`;
   const headers = {
-    Accept: "audio/mpeg",
-    "xi-api-key": ELEVENLABS_API_KEY,
     "Content-Type": "application/json",
+    Accept: "application/json",
   };
+
   const reqBody = JSON.stringify({
-    text: input,
-    model_id: "eleven_monolingual_v1",
-    voice_settings: {
-      stability: 0.5,
-      similarity_boost: 0.5,
-    },
+    phrase: input,
+    source_language: "french",
+    target_language: "english",
   });
 
   try {
@@ -56,16 +41,58 @@ export async function elevenlabs({
       throw new Error(response.statusText);
     }
 
-    const result = await response.blob();
-    console.log("background result", { result });
-    const base64 = await convertBlobToBase64(result);
-    console.log("background result", { base64 });
-    return base64;
-    
+    const data = await response.json();
+    console.log(data)
+    return { result: data};
   } catch (error) {
-    console.log(error);
-    return error as string;
+    console.log("[TRANSLATION_DEEPL]", error);
+    return { result: error as string };
   }
+
+  //   const messages: ChatCompletionRequestMessage[] = [];
+
+  //   if (slot.system) {
+  //     messages.push({
+  //       role: "system",
+  //       content: slot.system,
+  //     });
+  //   }
+  //   if (hasChats(chats)) {
+  //     messages.push(...convertChatsToMessages(chats));
+  //   }
+  //   if (input) {
+  //     messages.push({ role: "user", content: input });
+  //   }
+
+  //   let response = await requestApi(apiKey, {
+  //     model: slot.type === "ChatGPT" ? "gpt-3.5-turbo" : "gpt-4",
+  //     max_tokens: slot.maxTokens,
+  //     messages,
+  //     stream: true,
+  //     temperature: slot.temperature,
+  //     top_p: slot.topP,
+  //     frequency_penalty: slot.frequencyPenalty,
+  //     presence_penalty: slot.presencePenalty,
+  //   });
+
+  //   await handleError(response, async () => {
+  //     response = await requestApi(apiKey, {
+  //       model:
+  //         slot.type === "ChatGPT" ? "gpt-3.5-turbo-0125" : "gpt-4-turbo-preview",
+  //       max_tokens: slot.maxTokens,
+  //       messages,
+  //       stream: true,
+  //       temperature: slot.temperature,
+  //       top_p: slot.topP,
+  //       frequency_penalty: slot.frequencyPenalty,
+  //       presence_penalty: slot.presencePenalty,
+  //     });
+  //     await handleError(response);
+  //   });
+
+  //   const result = await parseResult(response, onDelta);
+
+  //   return { result };
 }
 
 async function handleError(

@@ -104,6 +104,23 @@ declare global {
     input?: string;
     data?: { result: string; chunk?: string; isDone?: boolean };
   };
+  type RequestDeepLTranslation = {
+    type: "RequestDeepLTranslation";
+    input?: string;
+    data?: {
+      result: {
+        translated_text: string;
+        translated_sentences: string[];
+        original_sentences: string[];
+      };
+      chunk?: {
+        translated_text: string;
+        translated_sentences: string[];
+        original_sentences: string[];
+      };
+      isDone?: boolean;
+    };
+  };
   type RequestNLP = {
     type: "RequestNLP";
     input?: string;
@@ -112,7 +129,11 @@ declare global {
   type RequestAudio = {
     type: "RequestAudio";
     input?: string;
-    data?: { result: string | ArrayBuffer; chunk?: ArrayBuffer; isDone?: boolean };
+    data?: {
+      result: string | ArrayBuffer | null;
+      chunk?: string | ArrayBuffer | null;
+      isDone?: boolean;
+    };
   };
   type RequestDragGPT = {
     type: "RequestDragGPTStream";
@@ -196,6 +217,7 @@ declare global {
   type Message =
     | RequestInitialDragGPT
     | RequestTranslation
+    | RequestDeepLTranslation
     | RequestNLP
     | RequestAudio
     | RequestQuickChatGPT

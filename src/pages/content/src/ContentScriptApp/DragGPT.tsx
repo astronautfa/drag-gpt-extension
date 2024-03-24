@@ -30,6 +30,26 @@ const Container = styled.div`
 
 const skipLoopCycleOnce = async () => await delayPromise(1);
 
+const b64toBlob = (b64Data: string, contentType = "", sliceSize = 512) => {
+  const byteCharacters = atob(b64Data);
+  const byteArrays = [];
+
+  for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+    const slice = byteCharacters.slice(offset, offset + sliceSize);
+
+    const byteNumbers = new Array(slice.length);
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+
+    const byteArray = new Uint8Array(byteNumbers);
+    byteArrays.push(byteArray);
+  }
+
+  const blob = new Blob(byteArrays, { type: contentType });
+  return blob;
+};
+
 async function getGPTResponseAsStream({
   input,
   onDelta,
@@ -112,7 +132,7 @@ async function getAudio({
   input: string;
   onFinish: (result: ArrayBuffer | string) => unknown;
 }) {
-  return new Promise<{ firstChunk: string | ArrayBuffer }>(
+  return new Promise<{ firstChunk: string | ArrayBuffer | null }>(
     (resolve, reject) => {
       sendMessageToBackground({
         message: {
@@ -120,8 +140,10 @@ async function getAudio({
           input,
         },
         handleSuccess: (response) => {
+          console.log(response);
           if (response.isDone) {
-            resolve({ firstChunk: response.result });
+            console.log("response is done");
+            // resolve({ firstChunk: response.result });
             return onFinish(response.result);
           }
         },
@@ -133,6 +155,10 @@ async function getAudio({
 
 export default function DragGPT() {
   const selectedSlot = useSelectedSlot();
+
+  const [audio, setAudio] = useState("");
+  const audioRef = useRef<any>(null);
+
   const [state, send] = useMachine(dragStateMachine, {
     actions: {
       setPositionOnScreen: (context) => {
@@ -173,27 +199,24 @@ export default function DragGPT() {
         return getAudio({
           input: context.selectedText,
           onFinish: async (result) => {
-            console.log(context)
-            console.log(result)
-            if (context.audioTrack) {
-              const arrayBuffer = context.audioTrack;
-              const blob = new Blob([arrayBuffer], {
-                type: "audio/mpeg",
-              });
-              const blobUrl = URL.createObjectURL(blob);
-              console.log(blobUrl);
-              setAudio(blobUrl);
-            }
+            // Create a new Blob object from the audio data with MIME type 'audio/mpeg'
+            console.log("ended", result);
+            const base64Return = await fetch(`${result}`);
+            const blob = await base64Return.blob();
+
+            const blobUrl = URL.createObjectURL(blob);
+            setAudio(blobUrl);
           },
         });
       },
     },
   });
 
-  const [audio, setAudio] = useState("");
-  const audioRef = useRef<any>(null);
-
   useEffect(() => {
+    console.log("audio changed", audio);
+    const audioElem = new Audio(audio);
+    audioElem.play();
+    console.log(audioElem)
     if (audio && audioRef.current) {
       audioRef.current.play();
     }
@@ -317,11 +340,16 @@ export default function DragGPT() {
           width={0}
         />
       )}
-      {state.hasTag("showAudioResponseMessages") && audio && (
-        <div className="bg-white fixed top-10 right-10 p-20">
-          <audio ref={audioRef} controls src={`${audio}`} className="w-full" />
+
+      {audio && (
+        <div className="bg-white fixed top-10 right-10 p-20 audioplayer">
+          <audio ref={audioRef} controls src={audio} className="w-full" />
+          {/* <audio autoPlay controls ref={audioRef}>
+            <source src={audio} type="audio/mpeg" />
+          </audio> */}
         </div>
       )}
+
       {state.matches("error_message_box") && (
         <ErrorMessageBox
           onClose={closeMessageBox}

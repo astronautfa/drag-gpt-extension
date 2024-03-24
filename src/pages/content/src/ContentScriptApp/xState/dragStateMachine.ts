@@ -55,7 +55,7 @@ type Services = {
     data: { firstChunk: string };
   };
   getAudioResponse: {
-    data: { firstChunk: string | ArrayBuffer };
+    data: { firstChunk: string | ArrayBuffer | null };
   };
 };
 
